@@ -50,6 +50,9 @@ diet_17 <- diet_17 %>% rename(WTDRD1=WTDRD1PP,
 diet_columns <- Reduce(intersect, list(colnames(diet_11), colnames(diet_13),
                                        colnames(diet_15), colnames(diet_17)))
 
+diet_filter <- grepl("DRQ", diet_columns) | grepl("DR1", diet_columns)
+diet_columns <- c("SEQN", diet_columns[diet_filter])
+
 diet_11 <- diet_11 %>% select(all_of(diet_columns))
 diet_13 <- diet_13 %>% select(all_of(diet_columns))
 diet_15 <- diet_15 %>% select(all_of(diet_columns))
