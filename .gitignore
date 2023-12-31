@@ -7,5 +7,6 @@
 *.html
 *.rds
 *.csv
+*.jpg
 *.Rmd
 *.pdf
