@@ -210,6 +210,130 @@ plot_hist <- recordPlot()
 
 ```{r}
 
+# svybarplot(demo_race~svy_year,design,col = "skyblue", border = "darkblue")
+# title("Race chages through the years")
+
+# Race changes through survey years
+race_table <- svytable(~demo_race+svy_year,design) %>% prop.table()
+race_table <- race_table / apply(race_table,2,sum)
+
+race_table_df <- as.data.frame(race_table)
+
+
+race_histogram<-ggplot(race_table_df,aes(x=svy_year,y=Freq,fill=demo_race))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Race",title="Changes of Race through survey years")+
+  scale_fill_brewer(palette = "Set1") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Gender changes through survey years, gender variable: demo_gender
+
+gender_table <- svytable(~demo_gender+svy_year,design) %>% prop.table()
+gender_table <- gender_table / apply(gender_table,2,sum)
+
+gender_table_df <- as.data.frame(gender_table)
+
+
+gender_histogram<-ggplot(gender_table_df,aes(x=svy_year,y=Freq,fill=demo_gender))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="gender",title="Changes of gender through survey years")+
+  scale_fill_brewer(palette = "Dark2") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Age changes through survey years, age variable: demo_age_cat
+
+age_table <- svytable(~demo_age_cat+svy_year,design) %>% prop.table()
+age_table <- age_table / apply(age_table,2,sum)
+
+age_table_df <- as.data.frame(age_table)
+
+
+age_histogram<-ggplot(age_table_df,aes(x=svy_year,y=Freq,fill=demo_age_cat))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Age",title="Changes of Age through survey years")+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# BMI changes through survey years, BMI variable: cc_bmi
+
+bmi_table <- svytable(~cc_bmi+svy_year,design) %>% prop.table()
+bmi_table <- bmi_table / apply(bmi_table,2,sum)
+
+bmi_table_df <- as.data.frame(bmi_table)
+
+
+bmi_histogram<-ggplot(bmi_table_df,aes(x=svy_year,y=Freq,fill=cc_bmi))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="BMI",title="Changes of BMI through survey years")+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+
+# Diabetes changes through survey years, Diabetes variable: cc_diabetes
+
+diabetes_table <- svytable(~cc_diabetes+svy_year,design) %>% prop.table()
+diabetes_table <- diabetes_table / apply(diabetes_table,2,sum)
+
+diabetes_table_df <- as.data.frame(diabetes_table)
+
+
+diabetes_histogram<-ggplot(diabetes_table_df,aes(x=svy_year,y=Freq,fill=cc_diabetes))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Diabetes",title="Changes of Diabetes through survey years")+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Hypertension changes through years, binary variable: htn_accaha
+
+htn_table <- svytable(~htn_accaha+svy_year,design) %>% prop.table()
+htn_table <- htn_table / apply(htn_table,2,sum)
+
+htn_table_df <- as.data.frame(htn_table)
+
+
+htn_histogram<-ggplot(htn_table_df,aes(x=svy_year,y=Freq,fill=htn_accaha))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Hypertension",title="Changes of Hypertension through survey years")+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+#library(patchwork)
+
+combined_hist<-race_histogram+gender_histogram+
+  age_histogram+bmi_histogram+diabetes_histogram+htn_histogram+
+  plot_layout(ncol=2) +
+  theme(plot.title = element_text(size = 14), 
+                      legend.position = "bottom")
+
+ggsave("combined_histograms.png", combined_hist, width = 16, height = 12)
+
+
+
+
+
+```
+
+
+
+
+
+
+```{r}
+
 svyboxplot(bp_dia_mean ~ demo_race, design, col = "skyblue", border = "darkblue")
 title("Boxplot of Diastolic Blood Pressure by Race")
 plot1 <- recordPlot()
