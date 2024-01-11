@@ -383,6 +383,44 @@ model %>% confint()
 ```
 
 
+```{r}
+
+# some model diagnosis
+
+predictions<-predict(model, type = "response")
+
+p=mean(nhanes_complete_selected_demo$htn_accaha_numeric)
+
+predicted_class <- ifelse(predictions > p, 1, 0) %>% unlist()
+
+
+
+actual = nhanes_complete_selected_demo$htn_accaha_numeric [nhanes_complete_selected_demo$cc_bmi %>% is.na() %>% `!`()]
+
+conf_matrix <- table(Predicted = predicted_class, Actual = actual)
+
+sensitivity_value <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
+specificity_value <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[1,2])
+accuracy_value <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[1,2]+conf_matrix[2,1]+conf_matrix[2,2])
+F1_score <- 2*sensitivity_value*specificity_value/(sensitivity_value+specificity_value)
+
+
+data.frame(sensitivity = sensitivity_value,
+           specificity = specificity_value,
+           accuracy = accuracy_value,
+           F1_score = F1_score)
+
+
+
+
+roc_obj <- roc(actual, predictions)
+
+plot(roc_obj, print.thres = "best", print.thres.best.method = "closest.topleft")
+
+auc(roc_obj)
+
+
+```
 
 
 
