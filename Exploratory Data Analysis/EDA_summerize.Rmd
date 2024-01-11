@@ -370,9 +370,15 @@ design_2017 <- svydesign(ids = ~svy_psu,
 # svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes,design_2013,family=binomial) %>% summary() %>% coef() %>% data.frame()
 
 
-svyglm(htn_accaha_numeric~svy_year*(demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes),design,family=binomial) %>% summary()
+model = svyglm(htn_accaha_numeric~svy_year*(demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes),design,family=binomial)
 
+model %>% summary() 
 
+```
+
+```{r}
+
+model %>% confint()
 
 ```
 
