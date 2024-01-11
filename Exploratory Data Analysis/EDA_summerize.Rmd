@@ -70,6 +70,12 @@ nhanes_complete_selected_no_diet <- nhanes_complete_selected_no_diet[,c("SEQN",
 
 nhanes_complete_selected_no_diet$htn_accaha <- as.factor(nhanes_complete_selected_no_diet$htn_accaha)
 
+temp_vec <-nhanes_complete_selected_demo$htn_accaha %>% as.factor() %>% as.integer()
+temp_vec <- temp_vec - 1
+nhanes_complete_selected_demo$htn_accaha_numeric <- temp_vec %>% as.integer()
+
+
+
 nhanes_complete_selected_no_diet$htn_accaha_numeric <-nhanes_complete_selected_no_diet$htn_accaha %>% as.factor() %>% as.numeric() - 1
 
 
@@ -197,16 +203,9 @@ income_table = t(income_table[,-1]) %>% as_tibble() %>% mutate(name = "Income Le
 
 
 
-## Diasystolic Blood Pressure
+## Change of Key Demo and Health variables through survey years
 
 
-```{r}
-
-svyhist(~bp_dia_mean, design, col = "skyblue", border = "darkblue")
-plot_hist <- recordPlot()
-
-
-```
 
 ```{r}
 
@@ -214,6 +213,7 @@ plot_hist <- recordPlot()
 # title("Race chages through the years")
 
 # Race changes through survey years
+
 race_table <- svytable(~demo_race+svy_year,design) %>% prop.table()
 race_table <- race_table / apply(race_table,2,sum)
 
@@ -322,77 +322,61 @@ combined_hist<-race_histogram+gender_histogram+
 ggsave("combined_histograms.png", combined_hist, width = 16, height = 12)
 
 
-
-
-
 ```
 
+```{r}
+
+year_vec <- nhanes_complete$svy_year %>% table() %>% names()
+
+nhanes_complete_selected_2011 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[1])
+nhanes_complete_selected_2013 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[2])
+nhanes_complete_selected_2015 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[3])
+nhanes_complete_selected_2017 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[4])
 
 
+design_2011 <- svydesign(ids = ~svy_psu, 
+                    strata = ~svy_strata, 
+                    weights = ~svy_weight_mec, 
+                    data = nhanes_complete_selected_2011,
+                    nest = TRUE)
+
+design_2013 <- svydesign(ids = ~svy_psu,
+                    strata = ~svy_strata,
+                    weights = ~svy_weight_mec,
+                    data = nhanes_complete_selected_2013,
+                    nest = TRUE)
+
+design_2015 <- svydesign(ids = ~svy_psu,
+                    strata = ~svy_strata,
+                    weights = ~svy_weight_mec,
+                    data = nhanes_complete_selected_2015,
+                    nest = TRUE)
+
+design_2017 <- svydesign(ids = ~svy_psu,
+                    strata = ~svy_strata,
+                    weights = ~svy_weight_mec,
+                    data = nhanes_complete_selected_2017,
+                    nest = TRUE)
+
+```
 
 
 
 ```{r}
 
-svyboxplot(bp_dia_mean ~ demo_race, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Race")
-plot1 <- recordPlot()
+# svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes,design_2011,family=binomial) %>% summary() %>% coef() %>% data.frame()
+# 
+# 
+# svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes,design_2013,family=binomial) %>% summary() %>% coef() %>% data.frame()
 
-svyboxplot(bp_dia_mean ~ demo_gender, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Gender")
-plot2 <- recordPlot()
 
-svyboxplot(bp_dia_mean ~ demo_age_cat, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Age Category")
-plot3 <- recordPlot()
+svyglm(htn_accaha_numeric~svy_year*(demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes),design,family=binomial) %>% summary()
 
-svyboxplot(bp_dia_mean ~ cc_bmi, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by BMI")
-plot4 <- recordPlot()
 
-## diabetes
-svyboxplot(bp_dia_mean ~ cc_diabetes, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Diabetes")
-plot5 <- recordPlot()
 
 ```
 
-## Systolic Blood Pressure
-
-```{r}
-
-svyhist(~bp_sys_mean, design, col = "skyblue", border = "darkblue")
-plot_hist <- recordPlot()
-
-```
-
-```{r}
-
-svyboxplot(bp_sys_mean ~ demo_race, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Race")
-plot1 <- recordPlot()
 
 
-svyboxplot(bp_sys_mean ~ demo_gender, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Gender")
-plot2 <- recordPlot()
-
-
-svyboxplot(bp_sys_mean ~ demo_age_cat, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Age Category")
-plot3 <- recordPlot()
-
-
-svyboxplot(bp_sys_mean ~ cc_bmi, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by BMI")
-plot4 <- recordPlot()
-
-## diabetes
-svyboxplot(bp_sys_mean ~ cc_diabetes, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Diabetes")
-plot5 <- recordPlot()
-
-
-```
 
 
