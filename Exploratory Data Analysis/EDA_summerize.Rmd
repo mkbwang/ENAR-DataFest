@@ -46,6 +46,43 @@ nhanes_complete_selected_demo <- nhanes_complete[,c("SEQN",
                                       "cc_bmi",
                                       "cc_diabetes")]
 
+nhanes_complete_selected_no_diet <- nhanes_complete %>% filter(bp_med_use == "No" & DRQSDIET != 1 &
+                                         !is.na(DR1TKCAL) & !is.na(INDFMPIR))
+
+nhanes_complete_selected_no_diet <- nhanes_complete_selected_no_diet[,c("SEQN",
+                                      "svy_year",
+                                      "svy_weight_mec",
+                                      "svy_psu",
+                                      "svy_strata",
+                                      "svy_subpop_htn",
+                                      "svy_subpop_chol",
+                                      "DMDEDUC2",
+                                      "INDFMPIR",
+                                      "demo_age_cat",
+                                      "demo_age_years", 
+                                      "demo_gender", 
+                                      "demo_race", 
+                                      "bp_sys_mean", 
+                                      "bp_dia_mean",
+                                      "htn_accaha",
+                                      "cc_bmi",
+                                      "cc_diabetes")]
+
+nhanes_complete_selected_no_diet$htn_accaha <- as.factor(nhanes_complete_selected_no_diet$htn_accaha)
+
+nhanes_complete_selected_no_diet$htn_accaha_numeric <-nhanes_complete_selected_no_diet$htn_accaha %>% as.factor() %>% as.numeric() - 1
+
+
+
+nhanes_complete_selected_no_diet <- nhanes_complete_selected_no_diet %>%
+  mutate(svy_weight_mec=svy_weight_mec/4,
+         svy_psu=svy_psu/4,
+         svy_strata=svy_strata/4)
+
+nhanes_complete_selected_demo <- nhanes_complete_selected_demo %>%
+  mutate(svy_weight_mec=svy_weight_mec/4,
+         svy_psu=svy_psu/4,
+         svy_strata=svy_strata/4)
 
 ```
 
@@ -62,6 +99,17 @@ aggr_plot <- aggr(nhanes_complete_selected_demo,
 
 ```
 
+```{r}
+
+aggr_plot_no_diet <- aggr(nhanes_complete_selected_no_diet, 
+                  col=c('navyblue','yellow'), 
+                  numbers=TRUE, sortVars=TRUE, 
+                  labels=names(data), cex.axis=.7, gap=3, 
+                  ylab=c("Histogram of missing data with no diet","Pattern"))
+
+```
+
+
 
 ## Checking variable distributions
 
@@ -77,11 +125,14 @@ design <- svydesign(ids = ~svy_psu,
 
 ```{r}
 
-# Checking the distribution of the outcome variable adjusted by demographic variables
+survey_year_table = svytable(~svy_year+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$svy_year %>% table() %>% rownames())
+p_value = chisq.test(svytable(~svy_year+htn_accaha, design))$p.value
+survey_year_table = survey_year_table %>% mutate(p_value = p_value)
 
-prop.table(svytable(htn_accaha~demo_race + demo_gender+demo_age_cat, design))
+survey_year_table
 
 ```
+
 
 ```{r}
 
