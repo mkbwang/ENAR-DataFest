@@ -344,6 +344,12 @@ nhanes_no_diet <- nhanes_no_diet[,  c("SEQN",
                                       "cc_diabetes")] %>% mutate(sugar = DR1TCARB-DR1TFIBE,
                                                                  fatacid = DR1TMFAT+DR1TPFAT)
 
+
+temp_vec <-nhanes_no_diet$htn_accaha %>% as.factor() %>% as.integer()
+temp_vec <- temp_vec - 1
+nhanes_no_diet$htn_accaha_numeric <- temp_vec %>% as.integer()
+
+
 design_no_diet <- svydesign(ids = ~svy_psu, 
                     strata = ~svy_strata, 
                     weights = ~svy_weight_mec, 
@@ -433,7 +439,7 @@ par(mfrow=c(2,2))
 #fiber
 
 box_1<-svyboxplot(DR1TFIBE~demo_race,design_no_diet,
-           xlab="Survey_year",ylab="Fiber",
+           xlab="Race",ylab="Fiber",
            main="Changes of Fiber between races",
            col="lightblue")
 
@@ -441,21 +447,21 @@ box_1<-svyboxplot(DR1TFIBE~demo_race,design_no_diet,
 #sugar
 
 box_2<-svyboxplot(sugar~demo_race,design_no_diet,
-           xlab="Survey_year",ylab="Sugar",
+           xlab="Race",ylab="Sugar",
            main="Changes of Sugar between races",
            col="lightblue")
 
 #saturated fat
 
 box_3<-svyboxplot(DR1TSFAT~demo_race,design_no_diet,
-           xlab="Survey_year",ylab="Saturated Fat",
+           xlab="Race",ylab="Saturated Fat",
            main="Changes of Saturated Fat between races",
            col="lightblue")
 
 #unsaturated fat
 
 box_4<-svyboxplot(fatacid~demo_race,design_no_diet,
-           xlab="Survey_year",ylab="Unsaturated Fat",
+           xlab="Race",ylab="Unsaturated Fat",
            main="Changes of Unsaturated Fat between races",
            col="lightblue")
 
@@ -477,7 +483,7 @@ par(mfrow=c(2,2))
 #fiber
 
 box_1<-svyboxplot(DR1TFIBE~htn_accaha,design_no_diet,
-           xlab="Survey_year",ylab="Fiber",
+           xlab="Hypertension",ylab="Fiber",
            main="Changes of Fiber among people with hypertension",
            col="lightblue")
 
@@ -485,7 +491,7 @@ box_1<-svyboxplot(DR1TFIBE~htn_accaha,design_no_diet,
 #sugar
 
 box_2<-svyboxplot(sugar~htn_accaha,design_no_diet,
-           xlab="Survey_year",ylab="Sugar",
+           xlab="Hypertension",ylab="Sugar",
            main="Changes of Sugar among people with hypertension",
            col="lightblue")
 
@@ -493,7 +499,7 @@ box_2<-svyboxplot(sugar~htn_accaha,design_no_diet,
 #saturated fat
 
 box_3<-svyboxplot(DR1TSFAT~htn_accaha,design_no_diet,
-           xlab="Survey_year",ylab="Saturated Fat",
+           xlab="Hypertension",ylab="Saturated Fat",
            main="Changes of Saturated Fat among people with hypertension",
            col="lightblue")
 
@@ -502,7 +508,7 @@ box_3<-svyboxplot(DR1TSFAT~htn_accaha,design_no_diet,
 #unsaturated fat
 
 box_4<-svyboxplot(fatacid~htn_accaha,design_no_diet,
-           xlab="Survey_year",ylab="Unsaturated Fat",
+           xlab="Hypertension",ylab="Unsaturated Fat",
            main="Changes of Unsaturated Fat among people with hypertension",
            col="lightblue")
 
@@ -513,12 +519,31 @@ box_4<-svyboxplot(fatacid~htn_accaha,design_no_diet,
 ### using logistic regression to check the association between macronutrients and hypertension
 
 ```{r}
-
-
-
-
-
-
+#fiber 
+fiber_htn<- svyglm(htn_accaha_numeric~demo_age_cat+demo_race+demo_gender+svy_year*DR1TFIBE, design_no_diet, family = binomial) 
+summary(fiber_htn)
+confint(fiber_htn)
 ```
 
+```{r}
+#sugar
+sugar_htn<-svyglm(htn_accaha_numeric~demo_age_cat+demo_race+demo_gender+svy_year*sugar, design_no_diet, family = binomial)
+summary(sugar_htn)
+confint(sugar_htn)
+```
 
+```{r}  
+#saturated fat
+satfat_htn <- svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+svy_year*DR1TSFAT, design_no_diet, family = binomial)
+summary(satfat_htn)
+confint(satfat_htn)
+```
+
+```{r}
+#unsaturated fat
+unsatfat_htn<-svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+svy_year*fatacid, design_no_diet, family = binomial)
+
+summary(unsatfat_htn)
+
+confint(unsatfat_htn)
+```
