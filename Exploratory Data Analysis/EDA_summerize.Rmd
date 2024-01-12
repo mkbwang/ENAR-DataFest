@@ -16,6 +16,8 @@ library(tidyverse)
 library(ggplot2)
 library(dplyr)
 library(VIM)
+library(patchwork)
+library(pROC)
 
 nhanes_complete = read.csv("nhanes_complete_data.csv")
 table(nhanes_complete$svy_year)
@@ -35,60 +37,18 @@ nhanes_complete_selected_demo <- nhanes_complete[,c("SEQN",
                                       "svy_subpop_htn",
                                       "svy_subpop_chol",
                                       "DMDEDUC2",
-                                      "INDFMPIR",
                                       "demo_age_cat",
                                       "demo_age_years", 
                                       "demo_gender", 
                                       "demo_race", 
-                                      "bp_sys_mean", 
-                                      "bp_dia_mean",
                                       "htn_accaha",
                                       "cc_bmi",
                                       "cc_diabetes")]
 
-nhanes_complete_selected_no_diet <- nhanes_complete %>% filter(bp_med_use == "No" & DRQSDIET != 1 &
-                                         !is.na(DR1TKCAL) & !is.na(INDFMPIR))
-
-nhanes_complete_selected_no_diet <- nhanes_complete_selected_no_diet[,c("SEQN",
-                                      "svy_year",
-                                      "svy_weight_mec",
-                                      "svy_psu",
-                                      "svy_strata",
-                                      "svy_subpop_htn",
-                                      "svy_subpop_chol",
-                                      "DMDEDUC2",
-                                      "INDFMPIR",
-                                      "demo_age_cat",
-                                      "demo_age_years", 
-                                      "demo_gender", 
-                                      "demo_race", 
-                                      "bp_sys_mean", 
-                                      "bp_dia_mean",
-                                      "htn_accaha",
-                                      "cc_bmi",
-                                      "cc_diabetes")]
-
-nhanes_complete_selected_no_diet$htn_accaha <- as.factor(nhanes_complete_selected_no_diet$htn_accaha)
 
 temp_vec <-nhanes_complete_selected_demo$htn_accaha %>% as.factor() %>% as.integer()
 temp_vec <- temp_vec - 1
 nhanes_complete_selected_demo$htn_accaha_numeric <- temp_vec %>% as.integer()
-
-
-
-nhanes_complete_selected_no_diet$htn_accaha_numeric <-nhanes_complete_selected_no_diet$htn_accaha %>% as.factor() %>% as.numeric() - 1
-
-
-
-nhanes_complete_selected_no_diet <- nhanes_complete_selected_no_diet %>%
-  mutate(svy_weight_mec=svy_weight_mec/4,
-         svy_psu=svy_psu/4,
-         svy_strata=svy_strata/4)
-
-nhanes_complete_selected_demo <- nhanes_complete_selected_demo %>%
-  mutate(svy_weight_mec=svy_weight_mec/4,
-         svy_psu=svy_psu/4,
-         svy_strata=svy_strata/4)
 
 ```
 
@@ -102,16 +62,6 @@ aggr_plot <- aggr(nhanes_complete_selected_demo,
                   numbers=TRUE, sortVars=TRUE, 
                   labels=names(data), cex.axis=.7, gap=3, 
                   ylab=c("Histogram of missing data","Pattern"))
-
-```
-
-```{r}
-
-aggr_plot_no_diet <- aggr(nhanes_complete_selected_no_diet, 
-                  col=c('navyblue','yellow'), 
-                  numbers=TRUE, sortVars=TRUE, 
-                  labels=names(data), cex.axis=.7, gap=3, 
-                  ylab=c("Histogram of missing data with no diet","Pattern"))
 
 ```
 
@@ -129,72 +79,58 @@ design <- svydesign(ids = ~svy_psu,
 ```
 
 
-```{r}
-
-survey_year_table = svytable(~svy_year+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$svy_year %>% table() %>% rownames())
-p_value = chisq.test(svytable(~svy_year+htn_accaha, design))$p.value
-survey_year_table = survey_year_table %>% mutate(p_value = p_value)
-
-survey_year_table
-
-```
-
 
 ```{r}
 
 # calculating the proportion and mean of the key covariates 
 
 survey_year_table = svytable(~svy_year+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$svy_year %>% table() %>% rownames())
-p_value = chisq.test(svytable(~svy_year+htn_accaha, design))$p.value
+p_value = svychisq(~svy_year+htn_accaha, design)$p.value
 survey_year_table = survey_year_table %>% mutate(p_value = p_value)
 
 
 age_table = svytable(~demo_age_cat+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name =  nhanes_complete$demo_age_cat %>% table() %>% rownames())
-p_value = chisq.test(svytable(~demo_age_cat+htn_accaha, design))$p.value
+p_value = svychisq(~demo_age_cat+htn_accaha, design)$p.value
 age_table = age_table %>% mutate(p_value = p_value)
 
 
 
 gender_table = svytable(~demo_gender+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble()%>% mutate(name = nhanes_complete$demo_gender %>% table() %>% rownames())
-p_value = chisq.test(svytable(~demo_gender+htn_accaha, design))$p.value
+p_value = svychisq(~demo_gender+htn_accaha, design)$p.value
 gender_table = gender_table %>% mutate(p_value = p_value)
 
 
 
 race_table = svytable(~demo_race+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$demo_race %>% table() %>% rownames())
-p_value =chisq.test(svytable(~demo_race+htn_accaha, design))$p.value
+p_value =svychisq(~demo_race+htn_accaha, design)$p.value
 race_table = race_table %>% mutate(p_value = p_value) 
 
 
-
-
 bmi_table = svytable(~cc_bmi+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$cc_bmi %>% table() %>% rownames())
-p_value =chisq.test(svytable(~cc_bmi+htn_accaha, design))$p.value
+p_value =svychisq(~cc_bmi+htn_accaha, design)$p.value
 bmi_table = bmi_table %>% mutate(p_value = p_value) 
 
 
-
-
 diabetes_table = svytable(~cc_diabetes+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$cc_diabetes %>% table() %>% rownames()) 
-p_value =chisq.test(svytable(~cc_diabetes+htn_accaha, design))$p.value
+p_value =svychisq(~cc_diabetes+htn_accaha, design)$p.value
 diabetes_table = diabetes_table %>% mutate(p_value = p_value)
 
 
 education_table = svytable(~DMDEDUC2+htn_accaha,design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$DMDEDUC2 %>% table() %>% rownames())
-p_value =chisq.test( svytable(~DMDEDUC2+htn_accaha,design))$p.value
+p_value =svychisq(~DMDEDUC2+htn_accaha,design)$p.value
 education_table = education_table %>% mutate(p_value = p_value)
 
 
-design_income_complete <- subset(design,!is.na(INDFMPIR)) 
-
-income_table = svyby(~INDFMPIR,~htn_accaha, design_income_complete,svymean) %>% as.data.frame.matrix() %>% as_tibble()
-income_table = t(income_table[,-1]) %>% as_tibble() %>% mutate(name = "Income Level")
+# design_income_complete <- subset(design,!is.na(INDFMPIR)) 
+# 
+# income_table = svyby(~INDFMPIR,~htn_accaha, design_income_complete,svymean) %>% as.data.frame.matrix() %>% as_tibble()
+# income_table = t(income_table[,-1]) %>% as_tibble() %>% mutate(name = "Income Level")
 
 
 # combinging all the tibbles vertically and write them into csv
 
-# bind_rows(list(survey_year_table,age_table,gender_table,race_table,
-#                bmi_table,diabetes_table,education_table,income_table)) %>% write.csv("table_one.csv")
+bind_rows(list(survey_year_table,age_table,gender_table,race_table,
+               bmi_table,diabetes_table,education_table)) %>% write.csv("table_one.csv")
 
 
 
@@ -205,12 +141,7 @@ income_table = t(income_table[,-1]) %>% as_tibble() %>% mutate(name = "Income Le
 
 ## Change of Key Demo and Health variables through survey years
 
-
-
 ```{r}
-
-# svybarplot(demo_race~svy_year,design,col = "skyblue", border = "darkblue")
-# title("Race chages through the years")
 
 # Race changes through survey years
 
@@ -219,11 +150,12 @@ race_table <- race_table / apply(race_table,2,sum)
 
 race_table_df <- as.data.frame(race_table)
 
+race_year_p <- svychisq(~demo_race+svy_year,design)$p.value
 
 race_histogram<-ggplot(race_table_df,aes(x=svy_year,y=Freq,fill=demo_race))+
   geom_bar(stat="identity",position=position_dodge())+
   theme_minimal()+
-  labs(x="Survey_year",y="Frequency",fill="Race",title="Changes of Race through survey years")+
+  labs(x="Survey_year",y="Frequency",fill="Race",title="Changes of Race through survey years", subtitle = paste0("Rao Scott test p value: ",round(race_year_p,4)))+
   scale_fill_brewer(palette = "Set1") +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
         plot.subtitle = element_text(hjust = 0.5))
@@ -235,11 +167,13 @@ gender_table <- gender_table / apply(gender_table,2,sum)
 
 gender_table_df <- as.data.frame(gender_table)
 
+gender_year_p <- svychisq(~demo_gender+svy_year,design)$p.value
 
 gender_histogram<-ggplot(gender_table_df,aes(x=svy_year,y=Freq,fill=demo_gender))+
   geom_bar(stat="identity",position=position_dodge())+
   theme_minimal()+
-  labs(x="Survey_year",y="Frequency",fill="gender",title="Changes of gender through survey years")+
+  labs(x="Survey_year",y="Frequency",fill="gender",title="Changes of gender through survey years",
+       subtitle =paste0("Rao Scott test p value: ",round(gender_year_p,4)) )+
   scale_fill_brewer(palette = "Dark2") +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
         plot.subtitle = element_text(hjust = 0.5))
@@ -252,11 +186,14 @@ age_table <- age_table / apply(age_table,2,sum)
 
 age_table_df <- as.data.frame(age_table)
 
+age_year_p <- svychisq(~demo_age_cat+svy_year,design)$p.value
+
 
 age_histogram<-ggplot(age_table_df,aes(x=svy_year,y=Freq,fill=demo_age_cat))+
   geom_bar(stat="identity",position=position_dodge())+
   theme_minimal()+
-  labs(x="Survey_year",y="Frequency",fill="Age",title="Changes of Age through survey years")+
+  labs(x="Survey_year",y="Frequency",fill="Age",title="Changes of Age through survey years",
+       subtitle=paste0("Rao Scott test p value: ",round(age_year_p,4)) )+
   scale_fill_manual(values = c("pink", "green", "blue", "black")) +
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
         plot.subtitle = element_text(hjust = 0.5))
@@ -269,11 +206,14 @@ bmi_table <- bmi_table / apply(bmi_table,2,sum)
 
 bmi_table_df <- as.data.frame(bmi_table)
 
+bmi_year_p <- svychisq(~cc_bmi+svy_year,design)$p.value
+
 
 bmi_histogram<-ggplot(bmi_table_df,aes(x=svy_year,y=Freq,fill=cc_bmi))+
   geom_bar(stat="identity",position=position_dodge())+
   theme_minimal()+
-  labs(x="Survey_year",y="Frequency",fill="BMI",title="Changes of BMI through survey years")+
+  labs(x="Survey_year",y="Frequency",fill="BMI",title="Changes of BMI through survey years",
+       subtitle = paste0("Rao Scott test p value: ",round(bmi_year_p,4)) )+
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
         plot.subtitle = element_text(hjust = 0.5))
 
@@ -286,27 +226,12 @@ diabetes_table <- diabetes_table / apply(diabetes_table,2,sum)
 
 diabetes_table_df <- as.data.frame(diabetes_table)
 
+diabetes_year_p <- svychisq(~cc_diabetes+svy_year,design)$p.value
 
 diabetes_histogram<-ggplot(diabetes_table_df,aes(x=svy_year,y=Freq,fill=cc_diabetes))+
   geom_bar(stat="identity",position=position_dodge())+
   theme_minimal()+
-  labs(x="Survey_year",y="Frequency",fill="Diabetes",title="Changes of Diabetes through survey years")+
-  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
-        plot.subtitle = element_text(hjust = 0.5))
-
-
-# Hypertension changes through years, binary variable: htn_accaha
-
-htn_table <- svytable(~htn_accaha+svy_year,design) %>% prop.table()
-htn_table <- htn_table / apply(htn_table,2,sum)
-
-htn_table_df <- as.data.frame(htn_table)
-
-
-htn_histogram<-ggplot(htn_table_df,aes(x=svy_year,y=Freq,fill=htn_accaha))+
-  geom_bar(stat="identity",position=position_dodge())+
-  theme_minimal()+
-  labs(x="Survey_year",y="Frequency",fill="Hypertension",title="Changes of Hypertension through survey years")+
+  labs(x="Survey_year",y="Frequency",fill="Diabetes",title="Changes of Diabetes through survey years",subtitle= paste0("Rao Scott test p value: ",round(diabetes_year_p,4)) )+
   theme(plot.title = element_text(hjust = 0.5, face = "bold"),
         plot.subtitle = element_text(hjust = 0.5))
 
@@ -314,7 +239,7 @@ htn_histogram<-ggplot(htn_table_df,aes(x=svy_year,y=Freq,fill=htn_accaha))+
 #library(patchwork)
 
 combined_hist<-race_histogram+gender_histogram+
-  age_histogram+bmi_histogram+diabetes_histogram+htn_histogram+
+  age_histogram+bmi_histogram+diabetes_histogram+
   plot_layout(ncol=2) +
   theme(plot.title = element_text(size = 14), 
                       legend.position = "bottom")
@@ -324,53 +249,16 @@ ggsave("combined_histograms.png", combined_hist, width = 16, height = 12)
 
 ```
 
-```{r}
-
-year_vec <- nhanes_complete$svy_year %>% table() %>% names()
-
-nhanes_complete_selected_2011 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[1])
-nhanes_complete_selected_2013 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[2])
-nhanes_complete_selected_2015 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[3])
-nhanes_complete_selected_2017 <- nhanes_complete_selected_demo %>% filter(svy_year == year_vec[4])
 
 
-design_2011 <- svydesign(ids = ~svy_psu, 
-                    strata = ~svy_strata, 
-                    weights = ~svy_weight_mec, 
-                    data = nhanes_complete_selected_2011,
-                    nest = TRUE)
-
-design_2013 <- svydesign(ids = ~svy_psu,
-                    strata = ~svy_strata,
-                    weights = ~svy_weight_mec,
-                    data = nhanes_complete_selected_2013,
-                    nest = TRUE)
-
-design_2015 <- svydesign(ids = ~svy_psu,
-                    strata = ~svy_strata,
-                    weights = ~svy_weight_mec,
-                    data = nhanes_complete_selected_2015,
-                    nest = TRUE)
-
-design_2017 <- svydesign(ids = ~svy_psu,
-                    strata = ~svy_strata,
-                    weights = ~svy_weight_mec,
-                    data = nhanes_complete_selected_2017,
-                    nest = TRUE)
-
-```
-
-
+## Survey GLM to verify the coherence of the data merging
 
 ```{r}
 
-# svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes,design_2011,family=binomial) %>% summary() %>% coef() %>% data.frame()
-# 
-# 
-# svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes,design_2013,family=binomial) %>% summary() %>% coef() %>% data.frame()
 
-
-model = svyglm(htn_accaha_numeric~svy_year*(demo_age_cat+demo_gender+demo_race+cc_bmi+cc_diabetes),design,family=binomial)
+model = svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+svy_year*cc_bmi+cc_diabetes,
+               design,
+               family=binomial)
 
 model %>% summary() 
 
@@ -424,5 +312,213 @@ auc(roc_obj)
 
 ```
 
+
+## EDA analysis on People With No diet 
+
+
+```{r}
+
+nhanes_no_diet <- nhanes_complete %>% filter(bp_med_use == "No" & DRQSDIET != 1 &
+                                         !is.na(DR1TKCAL) & !is.na(INDFMPIR))
+
+nhanes_no_diet <- nhanes_no_diet[,  c("SEQN",
+                                      "svy_year",
+                                      "svy_weight_mec",
+                                      "svy_psu",
+                                      "svy_strata",
+                                      "svy_subpop_htn",
+                                      "svy_subpop_chol",
+                                      "DMDEDUC2",
+                                      "demo_age_cat",
+                                      "demo_age_years", 
+                                      "demo_gender", 
+                                      "demo_race", 
+                                      "htn_accaha",
+                                      "DR1TFIBE",
+                                      "DR1TCARB",
+                                      "DR1TSFAT",
+                                      "DR1TMFAT",
+                                      "DR1TPFAT",
+                                      "DR1TALCO",
+                                      "cc_bmi",
+                                      "cc_diabetes")] %>% mutate(sugar = DR1TCARB-DR1TFIBE,
+                                                                 fatacid = DR1TMFAT+DR1TPFAT)
+
+design_no_diet <- svydesign(ids = ~svy_psu, 
+                    strata = ~svy_strata, 
+                    weights = ~svy_weight_mec, 
+                    data = nhanes_no_diet,
+                    nest = TRUE)
+
+```
+
+
+```{r}
+
+aggr_plot <- aggr(nhanes_no_diet, 
+                  col=c('navyblue','yellow'), 
+                  numbers=TRUE, sortVars=TRUE, 
+                  labels=names(data), cex.axis=.7, gap=3, 
+                  ylab=c("Histogram of missing data","Pattern"))
+
+
+```
+
+
+
+```{r}
+
+nhanes_no_diet [,c("DR1TFIBE",
+                   "DR1TCARB",
+                   "DR1TSFAT",
+                   "DR1TMFAT",
+                   "DR1TPFAT",
+                   "DR1TALCO",
+                   "sugar",
+                   "fatacid")] %>% summary()
+
+
+```
+
+
+### Changes of macronutrient variables through survey years
+
+#### fiber, sugar, saturated fat, unsaturated fat, alcohol
+
+
+```{r}
+
+png("macronutrient_changes.png", width = 16, height = 12, units = 'in', res = 300)
+
+par(mfrow=c(2,2))
+#fiber
+
+box_1<-svyboxplot(DR1TFIBE~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Fiber",
+           main="Changes of Fiber through survey years",
+           col="lightblue")
+
+
+#sugar
+
+box_2<-svyboxplot(sugar~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Sugar",
+           main="Changes of Sugar through survey years",
+           col="lightblue")
+
+#saturated fat
+
+box_3<-svyboxplot(DR1TSFAT~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Saturated Fat",
+           main="Changes of Saturated Fat through survey years",
+           col="lightblue")
+
+#unsaturated fat
+
+box_4<-svyboxplot(fatacid~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Unsaturated Fat",
+           main="Changes of Unsaturated Fat through survey years",
+           col="lightblue")
+
+```
+
+
+### Difference of Macronutrients between race displayed by boxplot
+
+```{r}
+
+png("macronutrient_racess.png", width = 18, height = 12, units = 'in', res = 300)
+
+par(mfrow=c(2,2))
+#fiber
+
+box_1<-svyboxplot(DR1TFIBE~demo_race,design_no_diet,
+           xlab="Survey_year",ylab="Fiber",
+           main="Changes of Fiber between races",
+           col="lightblue")
+
+
+#sugar
+
+box_2<-svyboxplot(sugar~demo_race,design_no_diet,
+           xlab="Survey_year",ylab="Sugar",
+           main="Changes of Sugar between races",
+           col="lightblue")
+
+#saturated fat
+
+box_3<-svyboxplot(DR1TSFAT~demo_race,design_no_diet,
+           xlab="Survey_year",ylab="Saturated Fat",
+           main="Changes of Saturated Fat between races",
+           col="lightblue")
+
+#unsaturated fat
+
+box_4<-svyboxplot(fatacid~demo_race,design_no_diet,
+           xlab="Survey_year",ylab="Unsaturated Fat",
+           main="Changes of Unsaturated Fat between races",
+           col="lightblue")
+
+
+
+```
+
+
+### Difference of macronutrients among people with hypertension
+
+
+
+```{r}
+
+png("macronutrient_htn.png", width = 18, height = 12, units = 'in', res = 300)
+
+par(mfrow=c(2,2))
+
+#fiber
+
+box_1<-svyboxplot(DR1TFIBE~htn_accaha,design_no_diet,
+           xlab="Survey_year",ylab="Fiber",
+           main="Changes of Fiber among people with hypertension",
+           col="lightblue")
+
+
+#sugar
+
+box_2<-svyboxplot(sugar~htn_accaha,design_no_diet,
+           xlab="Survey_year",ylab="Sugar",
+           main="Changes of Sugar among people with hypertension",
+           col="lightblue")
+
+
+#saturated fat
+
+box_3<-svyboxplot(DR1TSFAT~htn_accaha,design_no_diet,
+           xlab="Survey_year",ylab="Saturated Fat",
+           main="Changes of Saturated Fat among people with hypertension",
+           col="lightblue")
+
+
+
+#unsaturated fat
+
+box_4<-svyboxplot(fatacid~htn_accaha,design_no_diet,
+           xlab="Survey_year",ylab="Unsaturated Fat",
+           main="Changes of Unsaturated Fat among people with hypertension",
+           col="lightblue")
+
+
+```
+
+
+### using logistic regression to check the association between macronutrients and hypertension
+
+```{r}
+
+
+
+
+
+
+```
 
 
