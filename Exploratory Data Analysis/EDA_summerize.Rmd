@@ -21,6 +21,20 @@ library(pROC)
 
 nhanes_complete = read.csv("nhanes_complete_data.csv")
 table(nhanes_complete$svy_year)
+
+temp_table <- table(nhanes_complete$svy_year) %>% as.data.frame() 
+colnames(temp_table) <- c("year","count")
+
+
+ggplot(temp_table, aes(x=year, y=count)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=count), vjust=-0.3) + 
+  labs(title="Number of observations in each survey year", x="Year", y="Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5,face="bold", size=10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
 ```
 
 
@@ -64,6 +78,29 @@ aggr_plot <- aggr(nhanes_complete_selected_demo,
                   ylab=c("Histogram of missing data","Pattern"))
 
 ```
+
+
+```{r}
+
+nhanes_selected <- nhanes_complete_selected_demo %>% select(-c("SEQN","svy_year","svy_weight_mec","svy_psu","svy_strata","svy_subpop_htn","svy_subpop_chol","htn_accaha_numeric","DMDEDUC2"))
+
+missing_data<-sapply(nhanes_selected,function(x) sum(is.na(x)/length(x)))
+
+missing_data_df <- data.frame(
+  Variable = names(missing_data),
+  MissingPercentage = missing_data
+)
+
+
+ggplot(missing_data_df, aes(x = Variable, y = MissingPercentage)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Missing Ratio", x = "Demographic Variables", y = "Ratio of Missing") +
+  coord_flip()
+
+
+```
+
 
 
 
@@ -260,7 +297,16 @@ model = svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+svy_year*cc
                design,
                family=binomial)
 
-model %>% summary() 
+model %>% summary()
+
+# coef_<-model %>% summary() %>% coef() %>% round(.,4) 
+# 
+# glm_result<-cbind(coef_[,c(1,4)],confint(model)%>% as.data.frame() %>% round(.,4)) 
+# colnames(glm_result)<-c("Estimate","p value","2.5%","97.5%")
+# 
+# glm_result
+
+#kable(glm_result,format = "markdown",digits = 4,caption = "GLM result")
 
 ```
 
