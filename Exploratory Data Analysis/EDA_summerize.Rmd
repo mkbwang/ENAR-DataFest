@@ -48,6 +48,7 @@ nhanes_complete_selected_demo <- nhanes_complete[,c("SEQN",
                                       "svy_weight_mec",
                                       "svy_psu",
                                       "svy_strata",
+                                      "DMDEDUC2",
                                       "svy_subpop_htn",
                                       "svy_subpop_chol",
                                       "DMDEDUC2",
@@ -276,88 +277,17 @@ diabetes_histogram<-ggplot(diabetes_table_df,aes(x=svy_year,y=Freq,fill=cc_diabe
 #library(patchwork)
 
 combined_hist<-race_histogram+gender_histogram+
-  age_histogram+bmi_histogram+diabetes_histogram+
-  plot_layout(ncol=2) +
+  age_histogram+
+  plot_layout(ncol=1) +
   theme(plot.title = element_text(size = 14), 
                       legend.position = "bottom")
 
-ggsave("combined_histograms.png", combined_hist, width = 16, height = 12)
+ggsave("combined_histograms.png", combined_hist, width = 8, height = 12)
 
 
 ```
 
-
-
-## Survey GLM to verify the coherence of the data merging
-
-```{r}
-
-
-model = svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+svy_year*cc_bmi+cc_diabetes,
-               design,
-               family=binomial)
-
-model %>% summary()
-
-# coef_<-model %>% summary() %>% coef() %>% round(.,4) 
-# 
-# glm_result<-cbind(coef_[,c(1,4)],confint(model)%>% as.data.frame() %>% round(.,4)) 
-# colnames(glm_result)<-c("Estimate","p value","2.5%","97.5%")
-# 
-# glm_result
-
-#kable(glm_result,format = "markdown",digits = 4,caption = "GLM result")
-
-```
-
-```{r}
-
-model %>% confint()
-
-```
-
-
-```{r}
-
-# some model diagnosis
-
-predictions<-predict(model, type = "response")
-
-p=mean(nhanes_complete_selected_demo$htn_accaha_numeric)
-
-predicted_class <- ifelse(predictions > p, 1, 0) %>% unlist()
-
-
-
-actual = nhanes_complete_selected_demo$htn_accaha_numeric [nhanes_complete_selected_demo$cc_bmi %>% is.na() %>% `!`()]
-
-conf_matrix <- table(Predicted = predicted_class, Actual = actual)
-
-sensitivity_value <- conf_matrix[2,2]/(conf_matrix[2,2]+conf_matrix[2,1])
-specificity_value <- conf_matrix[1,1]/(conf_matrix[1,1]+conf_matrix[1,2])
-accuracy_value <- (conf_matrix[1,1]+conf_matrix[2,2])/(conf_matrix[1,1]+conf_matrix[1,2]+conf_matrix[2,1]+conf_matrix[2,2])
-F1_score <- 2*sensitivity_value*specificity_value/(sensitivity_value+specificity_value)
-
-
-data.frame(sensitivity = sensitivity_value,
-           specificity = specificity_value,
-           accuracy = accuracy_value,
-           F1_score = F1_score)
-
-
-
-
-roc_obj <- roc(actual, predictions)
-
-plot(roc_obj, print.thres = "best", print.thres.best.method = "closest.topleft")
-
-auc(roc_obj)
-
-
-
-
-```
-
+#age, race, gender, income, survey year
 
 ## EDA analysis on People With No diet 
 
@@ -402,6 +332,20 @@ design_no_diet <- svydesign(ids = ~svy_psu,
                     data = nhanes_no_diet,
                     nest = TRUE)
 
+
+temp_table <- table(nhanes_no_diet$svy_year) %>% as.data.frame() 
+colnames(temp_table) <- c("year","count")
+
+
+ggplot(temp_table, aes(x=year, y=count)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=count), vjust=-0.3) + 
+  labs(title="Number of observations in each survey year", x="Year", y="Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5,face="bold", size=10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
 ```
 
 
@@ -432,10 +376,209 @@ nhanes_no_diet [,c("DR1TFIBE",
 
 ```
 
+```{r}
+
+
+# Race changes through survey years
+
+race_table <- svytable(~demo_race+svy_year,design_no_diet) %>% prop.table()
+race_table <- race_table / apply(race_table,2,sum)
+
+race_table_df <- as.data.frame(race_table)
+
+race_year_p <- svychisq(~demo_race+svy_year,design_no_diet)$p.value
+
+race_histogram<-ggplot(race_table_df,aes(x=svy_year,y=Freq,fill=demo_race))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Race",title="Changes of Race through survey years", subtitle = paste0("Rao Scott test p value: ",round(race_year_p,4)))+
+  scale_fill_brewer(palette = "Set1") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Gender changes through survey years, gender variable: demo_gender
+
+gender_table <- svytable(~demo_gender+svy_year,design_no_diet) %>% prop.table()
+gender_table <- gender_table / apply(gender_table,2,sum)
+
+gender_table_df <- as.data.frame(gender_table)
+
+gender_year_p <- svychisq(~demo_gender+svy_year,design_no_diet)$p.value
+
+gender_histogram<-ggplot(gender_table_df,aes(x=svy_year,y=Freq,fill=demo_gender))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="gender",title="Changes of gender through survey years",
+       subtitle =paste0("Rao Scott test p value: ",round(gender_year_p,4)) )+
+  scale_fill_brewer(palette = "Dark2") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Age changes through survey years, age variable: demo_age_cat
+
+age_table <- svytable(~demo_age_cat+svy_year,design_no_diet) %>% prop.table()
+age_table <- age_table / apply(age_table,2,sum)
+
+age_table_df <- as.data.frame(age_table)
+
+age_year_p <- svychisq(~demo_age_cat+svy_year,design_no_diet)$p.value
+
+
+age_histogram<-ggplot(age_table_df,aes(x=svy_year,y=Freq,fill=demo_age_cat))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Age",title="Changes of Age through survey years",
+       subtitle=paste0("Rao Scott test p value: ",round(age_year_p,4)) )+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+combined_hist_no_diet<-race_histogram+gender_histogram+
+  age_histogram+
+  plot_layout(ncol=1) +
+  theme(plot.title = element_text(size = 14), 
+                      legend.position = "bottom")
+
+ggsave("combined_histograms_no_diet.png", combined_hist, width = 8, height = 12)
+
+```
+
+```{r}
+
+#race
+
+race_table_1 <- svytable(~htn_accaha+demo_race,design_no_diet) %>% prop.table()
+race_table_1 <- race_table_1 / apply(race_table_1,2,sum)
+
+race_table_df <- as.data.frame(race_table_1)
+
+race_year_p <- svychisq(~demo_race+htn_accaha_numeric,design_no_diet)$p.value
+
+race_histogram<-ggplot(race_table_df,aes(x=demo_race,y=Freq,fill=htn_accaha))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Race",y="Frequency",fill="Hypertention",title="Hypertention proportion grouped by Race", subtitle = paste0("Rao Scott test p value: <0.0001 "))+
+  scale_fill_brewer(palette = "Set1") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+
+# Gender
+
+gender_table <- svytable(~htn_accaha+demo_gender,design_no_diet) %>% prop.table()
+gender_table <- gender_table / apply(gender_table,2,sum)
+
+gender_table_df <- as.data.frame(gender_table)
+
+gender_year_p <- svychisq(~demo_gender+htn_accaha_numeric,design_no_diet)$p.value
+
+gender_histogram<-ggplot(gender_table_df,aes(x=demo_gender,y=Freq,fill=htn_accaha))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Gender",y="Frequency",fill="Hypertention",title="Hypertention proportion grouped by Gender",
+       subtitle =paste0("Rao Scott test p value: <0.001 "))+
+  scale_fill_brewer(palette = "Dark2") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+#Age Category
+
+age_table <- svytable(~htn_accaha+demo_age_cat,design_no_diet) %>% prop.table()
+age_table <- age_table / apply(age_table,2,sum)
+
+age_table_df <- as.data.frame(age_table)
+
+age_year_p <- svychisq(~demo_age_cat+htn_accaha_numeric,design_no_diet)$p.value
+
+
+age_histogram<-ggplot(age_table_df,aes(x=demo_age_cat,y=Freq,fill=htn_accaha))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Age",y="Frequency",fill="Hypertention",title="Hypertention proportion grouped by Age",
+       subtitle=paste0("Rao Scott test p value: <0.001 "))+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# BMI : cc_bmi
+
+bmi_table <- svytable(~htn_accaha+cc_bmi,design_no_diet) %>% prop.table()
+bmi_table <- bmi_table / apply(bmi_table,2,sum)
+
+bmi_table_df <- as.data.frame(bmi_table)
+
+bmi_year_p <- svychisq(~cc_bmi+htn_accaha_numeric,design_no_diet)$p.value
+
+
+bmi_histogram<-ggplot(bmi_table_df,aes(x=cc_bmi,y=Freq,fill=htn_accaha))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="BMI",y="Frequency",fill="Hypertention",title="Hypertention proportion grouped by BMI",
+       subtitle=paste0("Rao Scott test p value: <0.001 "))+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Diabetes cc_diabetes
+
+diabetes_table <- svytable(~htn_accaha+cc_diabetes,design_no_diet) %>% prop.table()
+diabetes_table <- diabetes_table / apply(diabetes_table,2,sum)
+
+diabetes_table_df <- as.data.frame(diabetes_table)
+
+diabetes_year_p <- svychisq(~cc_diabetes+htn_accaha_numeric,design_no_diet)$p.value
+
+
+diabetes_histogram<-ggplot(diabetes_table_df,aes(x=cc_diabetes,y=Freq,fill=htn_accaha))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Diabetes",y="Frequency",fill="Hypertention",title="Hypertention proportion grouped by Diabetes",
+       subtitle=paste0("Rao Scott test p value: <0.001 "))+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Education DMDEDUC2
+
+education_table <- svytable(~htn_accaha+DMDEDUC2,design_no_diet) %>% prop.table()
+education_table <- education_table / apply(education_table,2,sum)
+
+education_table_df <- as.data.frame(education_table)
+
+education_year_p <- svychisq(~DMDEDUC2+htn_accaha_numeric,design_no_diet)$p.value
+
+
+education_histogram<-ggplot(education_table_df,aes(x=DMDEDUC2,y=Freq,fill=htn_accaha))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Education",y="Frequency",fill="Hypertention",title="Hypertention proportion grouped by Education",
+       subtitle=paste0("Rao Scott test p value: <0.001 "))+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+combine_hitogram_no_diet <- age_histogram+race_histogram+bmi_histogram+gender_histogram+
+                              diabetes_histogram+plot_layout(ncol = 2)
+
+ggsave("combined_histograms_htn_accaha_no_diet.png", combine_hitogram_no_diet, width = 16, height = 12)
+
+
+```
+
 
 ### Changes of macronutrient variables through survey years
 
 #### fiber, sugar, saturated fat, unsaturated fat, alcohol
+
+
 
 
 ```{r}
@@ -448,7 +591,8 @@ par(mfrow=c(2,2))
 box_1<-svyboxplot(DR1TFIBE~svy_year,design_no_diet,
            xlab="Survey_year",ylab="Fiber",
            main="Changes of Fiber through survey years",
-           col="lightblue")
+           col="lightblue",
+           keep.var=TRUE,quantiles=c(0,0.25,0.5,0.75,1),ci=TRUE, na.rm = TRUE,vartype = "ci")
 
 
 #sugar
@@ -472,8 +616,11 @@ box_4<-svyboxplot(fatacid~svy_year,design_no_diet,
            main="Changes of Unsaturated Fat through survey years",
            col="lightblue")
 
+#par(OPAR)
+
 ```
 
+.
 
 ### Difference of Macronutrients between race displayed by boxplot
 
@@ -487,7 +634,7 @@ par(mfrow=c(2,2))
 box_1<-svyboxplot(DR1TFIBE~demo_race,design_no_diet,
            xlab="Race",ylab="Fiber",
            main="Changes of Fiber between races",
-           col="lightblue")
+           col="lightblue",keep.var=TRUE,quantiles=c(0,0.25,0.5,0.75,1))
 
 
 #sugar
@@ -561,35 +708,3 @@ box_4<-svyboxplot(fatacid~htn_accaha,design_no_diet,
 
 ```
 
-
-### using logistic regression to check the association between macronutrients and hypertension
-
-```{r}
-#fiber 
-fiber_htn<- svyglm(htn_accaha_numeric~demo_age_cat+demo_race+demo_gender+svy_year*DR1TFIBE, design_no_diet, family = binomial) 
-summary(fiber_htn)
-confint(fiber_htn)
-```
-
-```{r}
-#sugar
-sugar_htn<-svyglm(htn_accaha_numeric~demo_age_cat+demo_race+demo_gender+svy_year*sugar, design_no_diet, family = binomial)
-summary(sugar_htn)
-confint(sugar_htn)
-```
-
-```{r}  
-#saturated fat
-satfat_htn <- svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+svy_year*DR1TSFAT, design_no_diet, family = binomial)
-summary(satfat_htn)
-confint(satfat_htn)
-```
-
-```{r}
-#unsaturated fat
-unsatfat_htn<-svyglm(htn_accaha_numeric~demo_age_cat+demo_gender+demo_race+svy_year*fatacid, design_no_diet, family = binomial)
-
-summary(unsatfat_htn)
-
-confint(unsatfat_htn)
-```
