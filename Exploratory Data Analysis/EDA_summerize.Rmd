@@ -1,0 +1,223 @@
+---
+title: "EDA_no_imputation"
+
+output: html_document
+---
+
+
+## EDA
+
+## Load data
+
+
+```{r}
+library(survey)
+library(tidyverse)
+library(ggplot2)
+library(dplyr)
+library(VIM)
+
+nhanes_complete = read.csv("nhanes_complete_data.csv")
+table(nhanes_complete$svy_year)
+```
+
+
+
+
+# selecting variabes
+```{r}
+
+nhanes_complete_selected_demo <- nhanes_complete[,c("SEQN",
+                                      "svy_year",
+                                      "svy_weight_mec",
+                                      "svy_psu",
+                                      "svy_strata",
+                                      "svy_subpop_htn",
+                                      "svy_subpop_chol",
+                                      "DMDEDUC2",
+                                      "INDFMPIR",
+                                      "demo_age_cat",
+                                      "demo_age_years", 
+                                      "demo_gender", 
+                                      "demo_race", 
+                                      "bp_sys_mean", 
+                                      "bp_dia_mean",
+                                      "htn_accaha",
+                                      "cc_bmi",
+                                      "cc_diabetes")]
+
+
+```
+
+
+## Visualizing missing pattern
+
+```{r}
+
+aggr_plot <- aggr(nhanes_complete_selected_demo, 
+                  col=c('navyblue','yellow'), 
+                  numbers=TRUE, sortVars=TRUE, 
+                  labels=names(data), cex.axis=.7, gap=3, 
+                  ylab=c("Histogram of missing data","Pattern"))
+
+```
+
+
+## Checking variable distributions
+
+```{r}
+design <- svydesign(ids = ~svy_psu, 
+                    strata = ~svy_strata, 
+                    weights = ~svy_weight_mec, 
+                    data = nhanes_complete_selected_demo,
+                    nest = TRUE)
+
+```
+
+
+```{r}
+
+# Checking the distribution of the outcome variable adjusted by demographic variables
+
+prop.table(svytable(htn_accaha~demo_race + demo_gender+demo_age_cat, design))
+
+```
+
+```{r}
+
+# calculating the proportion and mean of the key covariates 
+
+survey_year_table = svytable(~svy_year+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$svy_year %>% table() %>% rownames())
+p_value = chisq.test(svytable(~svy_year+htn_accaha, design))$p.value
+survey_year_table = survey_year_table %>% mutate(p_value = p_value)
+
+
+age_table = svytable(~demo_age_cat+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name =  nhanes_complete$demo_age_cat %>% table() %>% rownames())
+p_value = chisq.test(svytable(~demo_age_cat+htn_accaha, design))$p.value
+age_table = age_table %>% mutate(p_value = p_value)
+
+
+
+gender_table = svytable(~demo_gender+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble()%>% mutate(name = nhanes_complete$demo_gender %>% table() %>% rownames())
+p_value = chisq.test(svytable(~demo_gender+htn_accaha, design))$p.value
+gender_table = gender_table %>% mutate(p_value = p_value)
+
+
+
+race_table = svytable(~demo_race+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$demo_race %>% table() %>% rownames())
+p_value =chisq.test(svytable(~demo_race+htn_accaha, design))$p.value
+race_table = race_table %>% mutate(p_value = p_value) 
+
+
+
+
+bmi_table = svytable(~cc_bmi+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$cc_bmi %>% table() %>% rownames())
+p_value =chisq.test(svytable(~cc_bmi+htn_accaha, design))$p.value
+bmi_table = bmi_table %>% mutate(p_value = p_value) 
+
+
+
+
+diabetes_table = svytable(~cc_diabetes+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$cc_diabetes %>% table() %>% rownames()) 
+p_value =chisq.test(svytable(~cc_diabetes+htn_accaha, design))$p.value
+diabetes_table = diabetes_table %>% mutate(p_value = p_value)
+
+
+education_table = svytable(~DMDEDUC2+htn_accaha,design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$DMDEDUC2 %>% table() %>% rownames())
+p_value =chisq.test( svytable(~DMDEDUC2+htn_accaha,design))$p.value
+education_table = education_table %>% mutate(p_value = p_value)
+
+
+design_income_complete <- subset(design,!is.na(INDFMPIR)) 
+
+income_table = svyby(~INDFMPIR,~htn_accaha, design_income_complete,svymean) %>% as.data.frame.matrix() %>% as_tibble()
+income_table = t(income_table[,-1]) %>% as_tibble() %>% mutate(name = "Income Level")
+
+
+# combinging all the tibbles vertically and write them into csv
+
+# bind_rows(list(survey_year_table,age_table,gender_table,race_table,
+#                bmi_table,diabetes_table,education_table,income_table)) %>% write.csv("table_one.csv")
+
+
+
+```
+
+
+
+
+## Diasystolic Blood Pressure
+
+
+```{r}
+
+svyhist(~bp_dia_mean, design, col = "skyblue", border = "darkblue")
+plot_hist <- recordPlot()
+
+
+```
+
+```{r}
+
+svyboxplot(bp_dia_mean ~ demo_race, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Diastolic Blood Pressure by Race")
+plot1 <- recordPlot()
+
+svyboxplot(bp_dia_mean ~ demo_gender, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Diastolic Blood Pressure by Gender")
+plot2 <- recordPlot()
+
+svyboxplot(bp_dia_mean ~ demo_age_cat, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Diastolic Blood Pressure by Age Category")
+plot3 <- recordPlot()
+
+svyboxplot(bp_dia_mean ~ cc_bmi, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Diastolic Blood Pressure by BMI")
+plot4 <- recordPlot()
+
+## diabetes
+svyboxplot(bp_dia_mean ~ cc_diabetes, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Diastolic Blood Pressure by Diabetes")
+plot5 <- recordPlot()
+
+```
+
+## Systolic Blood Pressure
+
+```{r}
+
+svyhist(~bp_sys_mean, design, col = "skyblue", border = "darkblue")
+plot_hist <- recordPlot()
+
+```
+
+```{r}
+
+svyboxplot(bp_sys_mean ~ demo_race, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Systolic Blood Pressure by Race")
+plot1 <- recordPlot()
+
+
+svyboxplot(bp_sys_mean ~ demo_gender, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Systolic Blood Pressure by Gender")
+plot2 <- recordPlot()
+
+
+svyboxplot(bp_sys_mean ~ demo_age_cat, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Systolic Blood Pressure by Age Category")
+plot3 <- recordPlot()
+
+
+svyboxplot(bp_sys_mean ~ cc_bmi, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Systolic Blood Pressure by BMI")
+plot4 <- recordPlot()
+
+## diabetes
+svyboxplot(bp_sys_mean ~ cc_diabetes, design, col = "skyblue", border = "darkblue")
+title("Boxplot of Systolic Blood Pressure by Diabetes")
+plot5 <- recordPlot()
+
+
+```
+
+
