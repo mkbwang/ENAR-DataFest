@@ -48,14 +48,21 @@ library(WeightIt)
 library(cobalt)
 library(CBPS)
 init.bal <- bal.tab(svy_year ~ demo_age_years + demo_race + demo_gender + INDFMPIR,
-                    data = dattable_subset, estimand = "ATE", thresholds = c(m = .05))
-init.bal
+                    data = dattable_subset, 
+                    estimand = "ATE", 
+                    thresholds = c(m = .05))
+#init.bal
+
+love.plot(init.bal)
 
 
 ## ----message=F-------------------------------------------------------------------------
 W.out <- weightit(svy_year ~ demo_age_years + demo_race + demo_gender + INDFMPIR,
                   data = dattable_subset, estimand = "ATE", 
                   method = "cbps", over=F)
+
+love.plot(W.out)
+
 summary(W.out)
 
 

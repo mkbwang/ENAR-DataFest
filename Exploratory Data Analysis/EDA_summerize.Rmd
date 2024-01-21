@@ -16,9 +16,25 @@ library(tidyverse)
 library(ggplot2)
 library(dplyr)
 library(VIM)
+library(patchwork)
+library(pROC)
 
 nhanes_complete = read.csv("nhanes_complete_data.csv")
 table(nhanes_complete$svy_year)
+
+temp_table <- table(nhanes_complete$svy_year) %>% as.data.frame() 
+colnames(temp_table) <- c("year","count")
+
+
+ggplot(temp_table, aes(x=year, y=count)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=count), vjust=-0.3) + 
+  labs(title="Number of observations in each survey year", x="Year", y="Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5,face="bold", size=10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
 ```
 
 
@@ -32,20 +48,23 @@ nhanes_complete_selected_demo <- nhanes_complete[,c("SEQN",
                                       "svy_weight_mec",
                                       "svy_psu",
                                       "svy_strata",
+                                      "DMDEDUC2",
                                       "svy_subpop_htn",
                                       "svy_subpop_chol",
                                       "DMDEDUC2",
-                                      "INDFMPIR",
                                       "demo_age_cat",
                                       "demo_age_years", 
                                       "demo_gender", 
                                       "demo_race", 
-                                      "bp_sys_mean", 
-                                      "bp_dia_mean",
                                       "htn_accaha",
+                                      "INDFMPIR",
                                       "cc_bmi",
                                       "cc_diabetes")]
 
+
+temp_vec <-nhanes_complete_selected_demo$htn_accaha %>% as.factor() %>% as.integer()
+temp_vec <- temp_vec - 1
+nhanes_complete_selected_demo$htn_accaha_numeric <- temp_vec %>% as.integer()
 
 ```
 
@@ -63,6 +82,30 @@ aggr_plot <- aggr(nhanes_complete_selected_demo,
 ```
 
 
+```{r}
+
+nhanes_selected <- nhanes_complete_selected_demo %>% select(-c("SEQN","svy_year","svy_weight_mec","svy_psu","svy_strata","svy_subpop_htn","svy_subpop_chol","htn_accaha_numeric","DMDEDUC2"))
+
+missing_data<-sapply(nhanes_selected,function(x) sum(is.na(x)/length(x)))
+
+missing_data_df <- data.frame(
+  Variable = names(missing_data),
+  MissingPercentage = missing_data
+)
+
+
+ggplot(missing_data_df, aes(x = Variable, y = MissingPercentage)) +
+  geom_bar(stat = "identity") +
+  theme_minimal() +
+  labs(title = "Missing Ratio", x = "Demographic Variables", y = "Ratio of Missing") +
+  coord_flip()
+
+
+```
+
+
+
+
 ## Checking variable distributions
 
 ```{r}
@@ -75,149 +118,502 @@ design <- svydesign(ids = ~svy_psu,
 ```
 
 
+
+## Change of Key Demo and Health variables through survey years
+
 ```{r}
 
-# Checking the distribution of the outcome variable adjusted by demographic variables
+# Race changes through survey years
 
-prop.table(svytable(htn_accaha~demo_race + demo_gender+demo_age_cat, design))
+race_table <- svytable(~demo_race+svy_year,design) %>% prop.table()
+race_table <- race_table / apply(race_table,2,sum)
+
+race_table_df <- as.data.frame(race_table)
+
+race_year_p <- svychisq(~demo_race+svy_year,design)$p.value
+
+race_histogram<-ggplot(race_table_df,aes(x=svy_year,y=Freq,fill=demo_race))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Race",title="Changes of Race through survey years", subtitle = paste0("Rao Scott test p value: ",round(race_year_p,4)))+
+  scale_fill_brewer(palette = "Set1") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Gender changes through survey years, gender variable: demo_gender
+
+gender_table <- svytable(~demo_gender+svy_year,design) %>% prop.table()
+gender_table <- gender_table / apply(gender_table,2,sum)
+
+gender_table_df <- as.data.frame(gender_table)
+
+gender_year_p <- svychisq(~demo_gender+svy_year,design)$p.value
+
+gender_histogram<-ggplot(gender_table_df,aes(x=svy_year,y=Freq,fill=demo_gender))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="gender",title="Changes of gender through survey years",
+       subtitle =paste0("Rao Scott test p value: ",round(gender_year_p,4)) )+
+  scale_fill_brewer(palette = "Dark2") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# Age changes through survey years, age variable: demo_age_cat
+
+age_table <- svytable(~demo_age_cat+svy_year,design) %>% prop.table()
+age_table <- age_table / apply(age_table,2,sum)
+
+age_table_df <- as.data.frame(age_table)
+
+age_year_p <- svychisq(~demo_age_cat+svy_year,design)$p.value
+
+
+age_histogram<-ggplot(age_table_df,aes(x=svy_year,y=Freq,fill=demo_age_cat))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Age",title="Changes of Age through survey years",
+       subtitle=paste0("Rao Scott test p value: ",round(age_year_p,4)) )+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+# BMI changes through survey years, BMI variable: cc_bmi
+
+bmi_table <- svytable(~cc_bmi+svy_year,design) %>% prop.table()
+bmi_table <- bmi_table / apply(bmi_table,2,sum)
+
+bmi_table_df <- as.data.frame(bmi_table)
+
+bmi_year_p <- svychisq(~cc_bmi+svy_year,design)$p.value
+
+
+bmi_histogram<-ggplot(bmi_table_df,aes(x=svy_year,y=Freq,fill=cc_bmi))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="BMI",title="Changes of BMI through survey years",
+       subtitle = paste0("Rao Scott test p value: ",round(bmi_year_p,4)) )+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+
+# Diabetes changes through survey years, Diabetes variable: cc_diabetes
+
+diabetes_table <- svytable(~cc_diabetes+svy_year,design) %>% prop.table()
+diabetes_table <- diabetes_table / apply(diabetes_table,2,sum)
+
+diabetes_table_df <- as.data.frame(diabetes_table)
+
+diabetes_year_p <- svychisq(~cc_diabetes+svy_year,design)$p.value
+
+diabetes_histogram<-ggplot(diabetes_table_df,aes(x=svy_year,y=Freq,fill=cc_diabetes))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Frequency",fill="Diabetes",title="Changes of Diabetes through survey years",subtitle= paste0("Rao Scott test p value: ",round(diabetes_year_p,4)) )+
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+
+#library(patchwork)
+
+combined_hist<-race_histogram+gender_histogram+
+  age_histogram+
+  plot_layout(ncol=1) +
+  theme(plot.title = element_text(size = 14), 
+                      legend.position = "bottom")
+
+ggsave("combined_histograms.png", combined_hist, width = 8, height = 12)
+
+
+```
+
+#age, race, gender, income, survey year
+
+## EDA analysis on People With No diet 
+
+
+```{r}
+
+nhanes_no_diet <- nhanes_complete %>% filter(bp_med_use == "No" & DRQSDIET != 1 &
+                                         !is.na(DR1TKCAL) & !is.na(INDFMPIR))
+
+nhanes_no_diet <- nhanes_no_diet[,  c("SEQN",
+                                      "svy_year",
+                                      "svy_weight_mec",
+                                      "svy_psu",
+                                      "svy_strata",
+                                      "svy_subpop_htn",
+                                      "svy_subpop_chol",
+                                      "INDFMPIR",
+                                      "htn_jnc7",
+                                      "demo_age_cat",
+                                      "demo_age_years", 
+                                      "demo_gender", 
+                                      "demo_race", 
+                                      "htn_accaha",
+                                      "DR1TFIBE",
+                                      "DR1TCARB",
+                                      "DR1TSFAT",
+                                      "DR1TMFAT",
+                                      "DR1TPFAT",
+                                      "DR1TALCO",
+                                      "cc_bmi",
+                                      "cc_diabetes")] %>% mutate(sugar = DR1TCARB-DR1TFIBE,
+                                                                 fatacid = DR1TMFAT+DR1TPFAT)
+
+
+temp_vec <-nhanes_no_diet$htn_accaha %>% as.factor() %>% as.integer()
+temp_vec <- temp_vec - 1
+nhanes_no_diet$htn_accaha_numeric <- temp_vec %>% as.integer()
+
+
+design_no_diet <- svydesign(ids = ~svy_psu, 
+                    strata = ~svy_strata, 
+                    weights = ~svy_weight_mec, 
+                    data = nhanes_no_diet,
+                    nest = TRUE)
+
+
+temp_table <- table(nhanes_no_diet$svy_year) %>% as.data.frame() 
+colnames(temp_table) <- c("year","count")
+
+
+ggplot(temp_table, aes(x=year, y=count)) +
+  geom_bar(stat="identity") +
+  geom_text(aes(label=count), vjust=-0.3) + 
+  labs(title="Number of observations in each survey year", x="Year", y="Count") +
+  theme_minimal() +
+  theme(plot.title = element_text(hjust = 0.5,face="bold", size=10),
+        panel.grid.major = element_blank(),
+        panel.grid.minor = element_blank())
+
+```
+
+
+```{r}
+
+aggr_plot <- aggr(nhanes_no_diet, 
+                  col=c('navyblue','yellow'), 
+                  numbers=TRUE, sortVars=TRUE, 
+                  labels=names(data), cex.axis=.7, gap=3, 
+                  ylab=c("Histogram of missing data","Pattern"))
+
 
 ```
 
 ```{r}
-
-# calculating the proportion and mean of the key covariates 
-
-survey_year_table = svytable(~svy_year+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$svy_year %>% table() %>% rownames())
-p_value = chisq.test(svytable(~svy_year+htn_accaha, design))$p.value
+survey_year_table = svytable(~svy_year+htn_jnc7, design_no_diet) %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$svy_year %>% table() %>% rownames())
+p_value = svychisq(~svy_year+htn_jnc7, design_no_diet)$p.value
 survey_year_table = survey_year_table %>% mutate(p_value = p_value)
 
 
-age_table = svytable(~demo_age_cat+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name =  nhanes_complete$demo_age_cat %>% table() %>% rownames())
-p_value = chisq.test(svytable(~demo_age_cat+htn_accaha, design))$p.value
+age_table = svytable(~demo_age_cat+htn_jnc7, design_no_diet) %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name =  nhanes_complete$demo_age_cat %>% table() %>% rownames())
+p_value = svychisq(~demo_age_cat+htn_jnc7, design_no_diet)$p.value
 age_table = age_table %>% mutate(p_value = p_value)
 
 
 
-gender_table = svytable(~demo_gender+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble()%>% mutate(name = nhanes_complete$demo_gender %>% table() %>% rownames())
-p_value = chisq.test(svytable(~demo_gender+htn_accaha, design))$p.value
+gender_table = svytable(~demo_gender+htn_jnc7, design_no_diet) %>% as.data.frame.matrix() %>% as_tibble()%>% mutate(name = nhanes_complete$demo_gender %>% table() %>% rownames())
+p_value = svychisq(~demo_gender+htn_jnc7, design_no_diet)$p.value
 gender_table = gender_table %>% mutate(p_value = p_value)
 
 
-
-race_table = svytable(~demo_race+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$demo_race %>% table() %>% rownames())
-p_value =chisq.test(svytable(~demo_race+htn_accaha, design))$p.value
+race_table = svytable(~demo_race+htn_jnc7, design_no_diet)  %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$demo_race %>% table() %>% rownames())
+p_value =svychisq(~demo_race+htn_jnc7, design_no_diet)$p.value
 race_table = race_table %>% mutate(p_value = p_value) 
 
 
 
-
-bmi_table = svytable(~cc_bmi+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$cc_bmi %>% table() %>% rownames())
-p_value =chisq.test(svytable(~cc_bmi+htn_accaha, design))$p.value
-bmi_table = bmi_table %>% mutate(p_value = p_value) 
-
-
-
-
-diabetes_table = svytable(~cc_diabetes+htn_accaha, design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$cc_diabetes %>% table() %>% rownames()) 
-p_value =chisq.test(svytable(~cc_diabetes+htn_accaha, design))$p.value
-diabetes_table = diabetes_table %>% mutate(p_value = p_value)
-
-
-education_table = svytable(~DMDEDUC2+htn_accaha,design) %>% prop.table() %>% as.data.frame.matrix() %>% as_tibble() %>% mutate(name = nhanes_complete$DMDEDUC2 %>% table() %>% rownames())
-p_value =chisq.test( svytable(~DMDEDUC2+htn_accaha,design))$p.value
-education_table = education_table %>% mutate(p_value = p_value)
-
-
-design_income_complete <- subset(design,!is.na(INDFMPIR)) 
-
-income_table = svyby(~INDFMPIR,~htn_accaha, design_income_complete,svymean) %>% as.data.frame.matrix() %>% as_tibble()
-income_table = t(income_table[,-1]) %>% as_tibble() %>% mutate(name = "Income Level")
-
-
-# combinging all the tibbles vertically and write them into csv
-
-# bind_rows(list(survey_year_table,age_table,gender_table,race_table,
-#                bmi_table,diabetes_table,education_table,income_table)) %>% write.csv("table_one.csv")
-
-
-
-```
-
-
-
-
-## Diasystolic Blood Pressure
-
-
-```{r}
-
-svyhist(~bp_dia_mean, design, col = "skyblue", border = "darkblue")
-plot_hist <- recordPlot()
+bind_rows(list(survey_year_table,age_table,gender_table,race_table)) %>% write.csv("table_two_actual_people_number.csv")
 
 
 ```
 
 ```{r}
 
-svyboxplot(bp_dia_mean ~ demo_race, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Race")
-plot1 <- recordPlot()
+nhanes_no_diet [,c("DR1TFIBE",
+                   "DR1TCARB",
+                   "DR1TSFAT",
+                   "DR1TMFAT",
+                   "DR1TPFAT",
+                   "DR1TALCO",
+                   "sugar",
+                   "fatacid")] %>% summary()
 
-svyboxplot(bp_dia_mean ~ demo_gender, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Gender")
-plot2 <- recordPlot()
-
-svyboxplot(bp_dia_mean ~ demo_age_cat, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Age Category")
-plot3 <- recordPlot()
-
-svyboxplot(bp_dia_mean ~ cc_bmi, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by BMI")
-plot4 <- recordPlot()
-
-## diabetes
-svyboxplot(bp_dia_mean ~ cc_diabetes, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Diastolic Blood Pressure by Diabetes")
-plot5 <- recordPlot()
-
-```
-
-## Systolic Blood Pressure
-
-```{r}
-
-svyhist(~bp_sys_mean, design, col = "skyblue", border = "darkblue")
-plot_hist <- recordPlot()
 
 ```
 
 ```{r}
 
-svyboxplot(bp_sys_mean ~ demo_race, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Race")
-plot1 <- recordPlot()
+
+# Race changes through survey years
+
+race_table <- svytable(~demo_race+svy_year,design_no_diet) %>% prop.table()
+race_table <- race_table / apply(race_table,2,sum)
+
+race_table_df <- as.data.frame(race_table)
+
+race_year_p <- svychisq(~demo_race+svy_year,design_no_diet)$p.value
+
+race_histogram<-ggplot(race_table_df,aes(x=svy_year,y=Freq,fill=demo_race))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Prop",fill="Race",title=" Race ")+
+  scale_fill_brewer(palette = "Set1") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
+
+# Gender changes through survey years, gender variable: demo_gender
+
+gender_table <- svytable(~demo_gender+svy_year,design_no_diet) %>% prop.table()
+gender_table <- gender_table / apply(gender_table,2,sum)
+
+gender_table_df <- as.data.frame(gender_table)
+
+gender_year_p <- svychisq(~demo_gender+svy_year,design_no_diet)$p.value
+
+gender_histogram<-ggplot(gender_table_df,aes(x=svy_year,y=Freq,fill=demo_gender))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Prop",fill="gender",title="Gender")+
+  scale_fill_brewer(palette = "Dark2") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
 
 
-svyboxplot(bp_sys_mean ~ demo_gender, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Gender")
-plot2 <- recordPlot()
+# Age changes through survey years, age variable: demo_age_cat
+
+age_table <- svytable(~demo_age_cat+svy_year,design_no_diet) %>% prop.table()
+age_table <- age_table / apply(age_table,2,sum)
+
+age_table_df <- as.data.frame(age_table)
+
+age_year_p <- svychisq(~demo_age_cat+svy_year,design_no_diet)$p.value
 
 
-svyboxplot(bp_sys_mean ~ demo_age_cat, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Age Category")
-plot3 <- recordPlot()
+age_histogram<-ggplot(age_table_df,aes(x=svy_year,y=Freq,fill=demo_age_cat))+
+  geom_bar(stat="identity",position=position_dodge())+
+  theme_minimal()+
+  labs(x="Survey_year",y="Prop",fill="Age",title=" Age ")+
+  scale_fill_manual(values = c("pink", "green", "blue", "black")) +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold"),
+        plot.subtitle = element_text(hjust = 0.5))
 
 
-svyboxplot(bp_sys_mean ~ cc_bmi, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by BMI")
-plot4 <- recordPlot()
+# Income INDFMPIR svyboxplot
 
-## diabetes
-svyboxplot(bp_sys_mean ~ cc_diabetes, design, col = "skyblue", border = "darkblue")
-title("Boxplot of Systolic Blood Pressure by Diabetes")
-plot5 <- recordPlot()
+income_boxplot <- svyboxplot(INDFMPIR~svy_year,design_no_diet,ylab="Income",xlab="Income",main="Income Boxplot")
+
+
+
+
+combined_hist_no_diet<-race_histogram+gender_histogram+
+  age_histogram+
+  plot_layout(nrow=1) +
+  theme(plot.title = element_text(size = 14), 
+                      legend.position = "bottom")
+
+ggsave("combined_histograms_no_diet.png", combined_hist_no_diet, width = 16, height = 6)
+
+```
+
+```{r}
+
+#race
+
+race_table_1 <- svytable(~htn_jnc7+demo_race,design_no_diet) %>% prop.table()
+race_table_1 <-  apply(race_table_1,2,function(x){x[2]/(x[1]+x[2])})
+
+race_table_df <- data.frame(demo_race = names(race_table_1),Odds=race_table_1)
+
+# race_year_p <- svychisq(~demo_race+htn_accaha_numeric,design_no_diet)$p.value
+
+race_histogram <- ggplot(race_table_df, aes(x = demo_race, y = Odds, fill = demo_race)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(palette = "Set1") +  # This line sets the color palette
+  theme_minimal() +
+  labs(x = "Race", y = "Prop", title = "Hypertension Proportion grouped by Race") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 25), 
+        axis.title = element_text(size = 25),
+        axis.text.x=element_text(size=12),
+        axis.text.y = element_text(size = 15),
+        legend.position="none")
+
+
+
+
+# Gender
+
+gender_table <- svytable(~htn_jnc7+demo_gender,design_no_diet) %>% prop.table()
+gender_table <- apply(gender_table,2,function(x){x[2]/(x[1]+x[2])})
+
+gender_table_df <- data.frame(demo_gender = names(gender_table),Odds=gender_table)
+
+#gender_year_p <- svychisq(~demo_gender+htn_accaha_numeric,design_no_diet)$p.value
+
+gender_histogram <- ggplot(gender_table_df, aes(x = demo_gender, y = Odds, fill = demo_gender)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(palette = "Set2") +  # Different color palette for distinction
+  theme_minimal() +
+  labs(x = "Gender", y = "Prop", title = "Hypertension Proportion grouped by Gender") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 25), 
+        axis.title = element_text(size = 25),  
+        axis.text = element_text(size = 15),legend.position="none")
+
+
+#Age Category
+
+age_table <- svytable(~htn_jnc7+demo_age_cat,design_no_diet) %>% prop.table()
+age_table <-apply(age_table,2,function(x){x[2]/(x[1]+x[2])})
+
+age_table_df <- data.frame(demo_age_cat = names(age_table),Odds=age_table)
+
+age_year_p <- svychisq(~demo_age_cat+htn_accaha_numeric,design_no_diet)$p.value
+
+
+age_histogram <- ggplot(age_table_df, aes(x = demo_age_cat, y = Odds, fill = demo_age_cat)) +
+  geom_bar(stat = "identity", position = position_dodge()) +
+  scale_fill_brewer(palette = "Set3") +  # Another distinct color palette
+  theme_minimal() +
+  labs(x = "Age", y = "Prop", title = "Hypertension Proportion grouped by Age Category") +
+  theme(plot.title = element_text(hjust = 0.5, face = "bold", size = 25), 
+        axis.title = element_text(size = 25),  
+        axis.text = element_text(size = 15),legend.position="none")
+
+
+
+combine_hitogram_no_diet <- age_histogram+race_histogram+gender_histogram+plot_layout(ncol = 3)
+
+ggsave("combined_histograms_htn_jnc7_no_diet.png", combine_hitogram_no_diet, width = 28, height = 10)
 
 
 ```
 
+### Changes of macronutrient variables through survey years
+
+#### fiber, sugar, saturated fat, unsaturated fat, changes through years
+
+```{r}
+
+#png("macronutrient_changes.png", width = 16, height = 12, units = 'in', res = 300)
+
+par(mfrow=c(2,2))
+#fiber
+
+box_1<-svyboxplot(DR1TFIBE~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Fiber",
+           main="Changes of Fiber through survey years",
+           col="lightblue",
+           keep.var=TRUE,quantiles=c(0,0.25,0.5,0.75,1),ci=TRUE, na.rm = TRUE,vartype = "ci")
+
+
+#sugar
+
+box_2<-svyboxplot(sugar~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Sugar",
+           main="Changes of Sugar through survey years",
+           col="lightblue")
+
+#saturated fat
+
+box_3<-svyboxplot(DR1TSFAT~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Saturated Fat",
+           main="Changes of Saturated Fat through survey years",
+           col="lightblue")
+
+#unsaturated fat
+
+box_4<-svyboxplot(fatacid~svy_year,design_no_diet,
+           xlab="Survey_year",ylab="Unsaturated Fat",
+           main="Changes of Unsaturated Fat through survey years",
+           col="lightblue")
+
+#par(OPAR)
+
+```
+
+### Difference of Macronutrients between race displayed by boxplot
+
+```{r}
+
+#png("macronutrient_racess.png", width = 18, height = 12, units = 'in', res = 300)
+
+par(mfrow=c(2,2))
+#fiber
+
+box_1<-svyboxplot(DR1TFIBE~demo_race,design_no_diet,
+           xlab="Race",ylab="Fiber",
+           main="Changes of Fiber between races",
+           col="lightblue",keep.var=TRUE,quantiles=c(0,0.25,0.5,0.75,1))
+
+
+#sugar
+
+box_2<-svyboxplot(sugar~demo_race,design_no_diet,
+           xlab="Race",ylab="Sugar",
+           main="Changes of Sugar between races",
+           col="lightblue")
+
+#saturated fat
+
+box_3<-svyboxplot(DR1TSFAT~demo_race,design_no_diet,
+           xlab="Race",ylab="Saturated Fat",
+           main="Changes of Saturated Fat between races",
+           col="lightblue")
+
+#unsaturated fat
+
+box_4<-svyboxplot(fatacid~demo_race,design_no_diet,
+           xlab="Race",ylab="Unsaturated Fat",
+           main="Changes of Unsaturated Fat between races",
+           col="lightblue")
+
+
+
+```
+
+### Difference of macronutrients among people with hypertension
+
+```{r}
+
+#png("macronutrient_htn.png", width = 18, height = 12, units = 'in', res = 300)
+
+par(mfrow=c(2,2))
+
+#fiber
+
+box_1<-svyboxplot(DR1TFIBE~htn_accaha,design_no_diet,
+           xlab="Hypertension",ylab="Fiber",
+           main="Changes of Fiber among people with hypertension",
+           col="lightblue")
+
+
+#sugar
+
+box_2<-svyboxplot(sugar~htn_accaha,design_no_diet,
+           xlab="Hypertension",ylab="Sugar",
+           main="Changes of Sugar among people with hypertension",
+           col="lightblue")
+
+
+#saturated fat
+
+box_3<-svyboxplot(DR1TSFAT~htn_accaha,design_no_diet,
+           xlab="Hypertension",ylab="Saturated Fat",
+           main="Changes of Saturated Fat among people with hypertension",
+           col="lightblue")
+
+
+
+#unsaturated fat
+
+box_4<-svyboxplot(fatacid~htn_accaha,design_no_diet,
+           xlab="Hypertension",ylab="Unsaturated Fat",
+           main="Changes of Unsaturated Fat among people with hypertension",
+           col="lightblue")
+
+
+```
 
