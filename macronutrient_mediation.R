@@ -45,10 +45,10 @@ sugar_fiber <- c(0, sqrt(1/2), -sqrt(1/2), rep(0, 3))
 sat_unsat <- c(rep(0, 3), sqrt(1/2), -sqrt(1/2), 0)
 effsize_mat <- cbind(alcohol_others, protein_others, fat_carbo, sugar_fiber, sat_unsat)
 t_effsize_mat <- t(effsize_mat)
-rownames(t_effsize_mat) <- c("Alcohol VS Others", "Protein VS Fat and Carbohydrates", 
-                             "Fat VS Carbohydrates", "Sugar VS Fiber", "Sat Fat VS Unsat Fat")
+rownames(t_effsize_mat) <- c("Alcohol vs. Others", "Protein vs. Fats and Carbs", 
+                             "Fats vs. Carbs", "Sugar vs. Fiber", "Sat Fats vs. Unsat Fats")
 colnames(t_effsize_mat) <- c("Protein", "Sugar", "Fiber", 
-                             "Sat Fat", "Unsat Fat", "Alcohol")
+                             "Sat Fats", "Unsat Fats", "Alcohol")
 knitr::kable(as.data.frame(t_effsize_mat), digits=4)
 
 
@@ -257,15 +257,37 @@ library(tidyr)
 med1_result <- as.data.frame(med1_result)
 med1_result$X <- rownames(med1_result)
 med1_result_long <- pivot_longer(med1_result, -c(X), values_to="Inference", names_to = "Mediator")
+med1_result_long$X <- recode(med1_result_long$X, 
+                             svy_year1 = "2013-2014 vs. 2011-2012",
+                             svy_year2 = "2015-2016 vs. 2011-2014",
+                             svy_year3 = "2017-2020 vs. 2011-2016",
+                             Black = "Black vs. White",
+                             Asian= "Asian vs. White",
+                             Hispanic = "Hispanic vs. White",
+                             Others = "Others vs. White",
+                             genderFemale = "Female vs. Male",
+                             centered_age = "Age",
+                             poverty="Poverty")
+med1_result_long$Mediator <- recode(med1_result_long$Mediator, 
+                                    Alcohol_Others= "Alcohol vs. Others",
+                                    Fat_Carbo = "Fats vs. Carbs",
+                                    Protein_Others = "Protein vs. Others",
+                                    Sat_Unsat = "Sat vs. Unsat Fats",
+                                    Sugar_Fiber = "Sugar vs. Fiber")
+med1_result_long <- med1_result_long %>% filter(X != "energy")
 med1_result_long$X <- factor(med1_result_long$X, 
-                             levels=c("svy_year1", "svy_year2", "svy_year3", 
-                                      "Black", "Asian", "Hispanic", "Others",
-                                      "genderFemale", "centered_age", "poverty", "energy"))
+                             levels=c("Others vs. White", "Hispanic vs. White", "Asian vs. White", "Black vs. White", "Poverty", "Age",
+                                      "Female vs. Male", "2017-2020 vs. 2011-2016", "2015-2016 vs. 2011-2014", "2013-2014 vs. 2011-2012"))
+med1_result_long$Mediator <- factor(med1_result_long$Mediator,
+                                    levels= c("Alcohol vs. Others", "Protein vs. Others", "Fats vs. Carbs", "Sat vs. Unsat Fats", "Sugar vs. Fiber"))
+
 med1_result_long$Inference <- as.factor(med1_result_long$Inference)
 library(ggplot2)
 ggplot(med1_result_long, aes(Mediator, X)) + geom_tile(aes(fill=Inference), color="#222222") +
-  scale_fill_manual(values=c("#3366ff", "#FFFFFF", "#cc0000")) + theme_bw() + 
-  theme(text = element_text(size=12)) + theme(legend.position = "none")
+  scale_fill_manual(values=c("#3366ff", "#FFFFFF", "#aa0000")) + theme_bw() + 
+  theme(text = element_text(size=12),
+        axis.title=element_blank()) + 
+  theme(legend.position = "none")
 
 
 ## ----direct effect inference------------------------------------------------------
@@ -292,6 +314,7 @@ direct_inference <- cbind(direct_estimate, direct_lower, direct_upper, direct_re
 colnames(direct_inference) <- c("Estimate", "95% Lower", "95% Upper", "Significance")
 rownames(direct_inference)[9] <- "Female"
 knitr::kable(as.data.frame(direct_inference), digits=4)
+write.csv(direct_inference, "direct_effect.csv")
 
 
 ## ----nutrient on hypertension-----------------------------------------------------
@@ -317,6 +340,7 @@ names(med2_result) <- names(med2_estimate)
 med2_inference <- cbind(med2_estimate, med2_lower, med2_upper, med2_result)
 colnames(med2_inference) <- c("Estimate", "95% Lower", "95% Upper", "Significance")
 knitr::kable(as.data.frame(med2_inference), digits=4)
+write.csv(med2_inference, "med2_inference.csv")
 
 
 ## ---------------------------------------------------------------------------------
@@ -352,14 +376,33 @@ indirect_result <- as.data.frame(indirect_result)
 indirect_result$X <- rownames(indirect_result)
 indirect_result_long <- pivot_longer(as.data.frame(indirect_result),
                                      -c(X), values_to="Inference", names_to = "Mediator")
+indirect_result_long$X <- recode(indirect_result_long$X, 
+                                 svy_year1 = "2013-2014 vs. 2011-2012",
+                                 svy_year2 = "2015-2016 vs. 2011-2014",
+                                 svy_year3 = "2017-2020 vs. 2011-2016",
+                                 Black = "Black vs. White",
+                                 Asian= "Asian vs. White",
+                                 Hispanic = "Hispanic vs. White",
+                                 Others = "Others vs. White",
+                                 genderFemale = "Female vs. Male",
+                                 centered_age = "Age",
+                                 poverty="Poverty")
+indirect_result_long$Mediator <- recode(indirect_result_long$Mediator, 
+                                    Alcohol_Others= "Alcohol vs. Others",
+                                    Fat_Carbo = "Fats vs. Carbs",
+                                    Protein_Others = "Protein vs. Others",
+                                    Sat_Unsat = "Sat vs. Unsat Fats",
+                                    Sugar_Fiber = "Sugar vs. Fiber")
+indirect_result_long <- indirect_result_long %>% filter(X != "energy")
 indirect_result_long$X <- factor(indirect_result_long$X, 
-                             levels=c("svy_year1", "svy_year2", "svy_year3", 
-                                      "Black", "Asian", "Hispanic", "Others",
-                                      "genderFemale", "centered_age", "poverty", "energy"))
+                             levels=c("Others vs. White", "Hispanic vs. White", "Asian vs. White", "Black vs. White", "Poverty", "Age",
+                                      "Female vs. Male", "2017-2020 vs. 2011-2016", "2015-2016 vs. 2011-2014", "2013-2014 vs. 2011-2012"))
+indirect_result_long$Mediator <- factor(indirect_result_long$Mediator,
+                                    levels= c("Alcohol vs. Others", "Protein vs. Others", "Fats vs. Carbs", "Sat vs. Unsat Fats", "Sugar vs. Fiber"))
 indirect_result_long$Inference <- as.factor(indirect_result_long$Inference)
 library(ggplot2)
 ggplot(indirect_result_long, aes(Mediator, X)) + 
   geom_tile(aes(fill=Inference), color="#222222") +
-  scale_fill_manual(values=c("#3366ff", "#FFFFFF", "#cc0000")) + theme_bw() + 
-  theme(text = element_text(size=12)) + theme(legend.position = "none")
+  scale_fill_manual(values=c("#3366ff", "#FFFFFF", "#aa0000")) + theme_bw() + 
+  theme(text = element_text(size=12)) + theme(legend.position = "none", axis.title=element_blank())
 
