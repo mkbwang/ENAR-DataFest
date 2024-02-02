@@ -1,5 +1,5 @@
 # ENAR DataFest 2024
-The codes in this repository are owned by Mukai Wang (University of Michigan), Bulun Te (University of Michigan) and Suene Paloma Lima (Ohio University). They contain the data cleaning, exploratory data analysis and mediation analysis of [NHANES data](https://www.cdc.gov/nchs/nhanes/index.htm) for the [ENAR 2024 DataFest](https://www.enar.org/meetings/spring2024/program/datafest_submission.cfm). The project is titled "Mediation Analysis of Macronutrient Composition and Hypertension  Among US Adults".
+The codes in this repository are owned by Mukai Wang (University of Michigan), Bulun Te (University of Michigan) and Sueny Paloma Lima (Ohio University). They contain the data cleaning, exploratory data analysis and mediation analysis of [NHANES data](https://www.cdc.gov/nchs/nhanes/index.htm) for the [ENAR 2024 DataFest](https://www.enar.org/meetings/spring2024/program/datafest_submission.cfm). The project is titled "Mediation Analysis of Macronutrient Composition and Hypertension  Among US Adults".
 
 
 * `nutrient_matching.R:` Retrieve the diet data from survey responses between 2011 and 2020 in [NHANES](https://wwwn.cdc.gov/nchs/nhanes/) and merge them with the hypertension diagnoses in [cardioStatsUSA](https://github.com/jhs-hwg/cardioStatsUSA) based on SEQN number.
